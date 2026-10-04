@@ -131,37 +131,80 @@ def sort_key(item):
     return d if isinstance(d, datetime) else datetime.max.replace(tzinfo=timezone.utc)
 
 
-def format_item(item):
-    title = esc(item.get("title") or "Untitled")
+NUM = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣"]
+DIVIDER = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+
+
+def clean_prize(item):
+    p = str(item.get("prize") or "").strip()
+    if not p:
+        return ""
+    digits = re.sub(r"[^\d]", "", p)
+    if digits and int(digits) == 0:
+        return ""
+    if p.isdigit():
+        return "₹" + f"{int(p):,}"
+    return p
+
+
+def days_left(dl):
+    if not isinstance(dl, datetime):
+        return ""
+    n = (dl.date() - datetime.now(timezone.utc).date()).days
+    if n <= 0:
+        return " 🔥 <b>closes today</b>"
+    if n == 1:
+        return " 🔥 <b>1 day left</b>"
+    if n <= 3:
+        return f" ⚠️ <b>{n} days left</b>"
+    return f" ({n} days left)"
+
+
+def format_item(item, idx=0):
+    title = esc(item.get("title") or "Untitled").strip()
     url = item.get("url")
-    line = f'• <a href="{esc(url)}">{title}</a>' if url else f"• <b>{title}</b>"
-    details = []
+    num = NUM[idx] if idx < len(NUM) else "▪️"
+    head = f'{num} <b><a href="{esc(url)}">{title}</a></b>' if url else f"{num} <b>{title}</b>"
+
+    lines = []
     if item.get("org"):
-        details.append(f"🏢 {esc(item['org'])}")
+        lines.append(f"🏢 {esc(item['org'])}")
+
+    when = []
     if item.get("mode"):
-        details.append(f"📍 {esc(str(item['mode']).title())}")
+        mode = str(item["mode"]).strip().title()
+        icon = "💻" if mode.lower() == "online" else "📍"
+        when.append(f"{icon} {esc(mode)}")
     dl = item.get("deadline")
     if dl:
-        text = fmt_date(dl) if isinstance(dl, datetime) else str(dl)
-        details.append(f"⏳ {esc(text)}")
-    if item.get("prize"):
-        details.append(f"🏆 {esc(item['prize'])}")
+        if isinstance(dl, datetime):
+            when.append(f"⏳ Closes <b>{esc(fmt_date(dl))}</b>{days_left(dl)}")
+        else:
+            when.append(f"🗓 {esc(dl)}")
+    if when:
+        lines.append("  •  ".join(when))
+
+    prize = clean_prize(item)
+    if prize:
+        lines.append(f"🏆 {esc(prize)}")
     if item.get("extra"):
-        details.append(f"🏷 {esc(item['extra'])}")
-    if details:
-        line += "\n   " + " | ".join(details)
-    return line
+        lines.append(f"🏷 <i>{esc(item['extra'])}</i>")
+
+    body = "\n".join(lines)
+    return f"{head}\n<blockquote>{body}</blockquote>" if body else head
 
 
 def section(title, items):
     items = items[:MAX_PER_SECTION]
+    header = f"<b>{title}</b>\n{DIVIDER}"
     if not items:
-        return f"<b>{title}</b>\n• No open listings found today."
-    return f"<b>{title}</b>\n" + "\n".join(format_item(i) for i in items)
+        return f"{header}\n<i>No open listings today.</i>"
+    body = "\n".join(format_item(i, n) for n, i in enumerate(items))
+    return f"{header}\n{body}"
 
 
 def build_digest():
-    today = datetime.now().strftime("%d %b %Y")
+    today = datetime.now().strftime("%A, %d %B %Y")
     seen = set()
 
     def unique(items):
@@ -187,15 +230,18 @@ def build_digest():
     debates = unique(debates)
 
     parts = [
-        f"📢 <b>Daily Competition &amp; Event Digest — {today}</b>",
-        section("🌐 International Hackathons (Devpost)", unique(devpost)),
-        section("🏛 Delhi NCR / Haryana / UP", regional),
-        section("🇮🇳 National — Hackathons", unique(hacks)),
-        section("🇮🇳 National — Quizzes", unique(quizzes)),
-        section("🇮🇳 National — Debates / MUN / Parliament", debates),
-        section("🇮🇳 National — E-Summits &amp; Conferences", unique(confs)),
-        "📍 <b>Local / Block level:</b> check <a href=\"https://nyks.nic.in/\">NYKS</a> and your district youth office for local events.\n"
-        "🔗 More: <a href=\"https://unstop.com/\">Unstop</a> | <a href=\"https://devpost.com/hackathons\">Devpost</a> | <a href=\"https://devfolio.co/hackathons\">Devfolio</a>",
+        f"✨ <b>DAILY EVENT DIGEST</b> ✨\n🗓 <i>{today}</i>\n<i>Hackathons • Quizzes • Debates • E-Summits</i>",
+        section("🌐 INTERNATIONAL HACKATHONS", unique(devpost)),
+        section("🏛 DELHI NCR • HARYANA • UP", regional),
+        section("💻 NATIONAL HACKATHONS", unique(hacks)),
+        section("🧠 NATIONAL QUIZZES", unique(quizzes)),
+        section("🎤 DEBATES • MUN • PARLIAMENT", debates),
+        section("🚀 E-SUMMITS &amp; CONFERENCES", unique(confs)),
+        "<b>📍 LOCAL / BLOCK LEVEL</b>\n" + DIVIDER + "\n"
+        "Check <a href=\"https://nyks.nic.in/\">NYKS</a> and your district youth office for local events.",
+        "<b>🔗 EXPLORE MORE</b>\n" + DIVIDER + "\n"
+        "<a href=\"https://unstop.com/\">Unstop</a>  •  <a href=\"https://devpost.com/hackathons\">Devpost</a>  •  <a href=\"https://devfolio.co/hackathons\">Devfolio</a>\n\n"
+        "<i>Good luck, go win something! 🏅</i>",
     ]
     return parts
 
