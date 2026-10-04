@@ -3,8 +3,8 @@ import requests
 from datetime import datetime
 
 # Configuration
-TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("CHAT_ID")
+TELEGRAM_BOT_TOKEN = "8805233054:AAHhDleg5SjHIismgXbsW-fCYN9791w1E2Y"
+TELEGRAM_CHAT_ID = "6494109304"
 
 def fetch_events():
     """
@@ -48,7 +48,11 @@ def send_telegram_message(message):
         "parse_mode": "Markdown"
     }
     response = requests.post(url, json=payload)
-    return response.json()
+    result = response.json()
+    print("Telegram response:", result)
+    if not result.get("ok"):
+        raise SystemExit(f"Telegram error: {result.get('description')}")
+    return result
 
 if __name__ == "__main__":
     content = fetch_events()
