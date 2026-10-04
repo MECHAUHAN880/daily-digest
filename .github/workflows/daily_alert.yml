@@ -2,7 +2,7 @@ name: Daily 10 AM Event Alert
 
 on:
   schedule:
-    - cron: '40 17 * * *'
+    - cron: '3 4 * * *'
   workflow_dispatch:
 
 jobs:
